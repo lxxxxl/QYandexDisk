@@ -7,6 +7,8 @@
 #include <QObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QJsonObject>
+#include <QJsonDocument>
 
 
 
@@ -20,13 +22,16 @@ public:
     // upload file to disk
     void upload(QString filename, QByteArray data);
     // remove file or directory from disk
+    // https://yandex.ru/dev/disk/api/reference/delete.html
     void remove(QString path);
     // create new directory
+    // https://yandex.ru/dev/disk/api/reference/create-folder.html
     void mkdir(QString path);
     // list files in directory
     void list(QString path);
     // get file size
     void size(QString path);
+    // https://yandex.ru/dev/disk/api/reference/capacity.html
     // get free space count on Disk
     void capacity();
 
@@ -38,18 +43,18 @@ public:
 
 
 public slots:
-    void readyRemove();
-    void readyMkdir();
+//    void readyRemove();
+//    void readyMkdir();
     void readyCapacity();
-    void readyUploadPhase1();
-    void readyUploadPhase2();
-    void readyDownloadPhase1();
-    void readyDownloadPhase2();
+//    void readyUploadPhase1();
+//    void readyUploadPhase2();
+//    void readyDownloadPhase1();
+//    void readyDownloadPhase2();
 
 signals:
     void signalRemoved(bool status);
     void signalCreated(bool status);
-    void signalCapacity(CapacityInfo *info);
+    void signalCapacity(QYandexDisk::CapacityInfo *info);
     void signalUploaded(bool status);
     void signalDownloaded(QByteArray data);
     void signalError();
