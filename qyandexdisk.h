@@ -23,6 +23,7 @@ public:
     // download file from disk
     void download(QString filename);
     // upload file to disk
+    // https://yandex.ru/dev/disk/api/reference/upload.html
     void upload(QString filename, QByteArray data);
     // remove file or directory from disk
     // https://yandex.ru/dev/disk/api/reference/delete.html
@@ -49,8 +50,8 @@ public slots:
     void readyRemove();
     void readyMkdir();
     void readyCapacity();
-//    void readyUploadPhase1();
-//    void readyUploadPhase2();
+    void readyUploadPhase1();
+    void readyUploadPhase2();
 //    void readyDownloadPhase1();
 //    void readyDownloadPhase2();
 

@@ -15,7 +15,10 @@ void QYandexDisk::download(QString filename)
 // upload file to disk
 void QYandexDisk::upload(QString filename, QByteArray data)
 {
-
+    QNetworkRequest *request = createRequest("resources/upload", filename);
+    m_reply = this->m_networkAccessManager->get(*request);
+    m_reply->setProperty("data", data);
+    connect(m_reply, SIGNAL(readyRead()), this, SLOT(readyUploadPhase1()));
 }
 // remove file or directory from disk
 void QYandexDisk::remove(QString path)
@@ -104,4 +107,33 @@ void QYandexDisk::readyMkdir()
     int status = statusCode.toInt();
     m_reply->deleteLater();
     emit signalCreated(status == HTTP_CREATED);
+}
+
+// slot for processing "upload" API request phase 1
+void QYandexDisk::readyUploadPhase1()
+{
+    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    int status = statusCode.toInt();
+    if (status != HTTP_OK){
+        emit signalError();
+        return;
+    }
+
+    QByteArray reply = m_reply->readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(reply);
+    QJsonObject obj = doc.object();
+
+    QString href = obj.value("href").toString();
+    QNetworkRequest *request = new QNetworkRequest(QUrl(href));
+    QByteArray data = m_reply->property("data").toByteArray();
+    m_reply = this->m_networkAccessManager->put(*request, data);
+    connect(m_reply, SIGNAL(finished()), this, SLOT(readyUploadPhase2()));
+}
+
+// slot for processing "upload" API request phase 2
+void QYandexDisk::readyUploadPhase2()
+{
+    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    int status = statusCode.toInt();
+    emit signalUploaded(status == HTTP_CREATED);
 }
