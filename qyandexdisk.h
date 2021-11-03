@@ -1,4 +1,7 @@
 /* Yandex Disk client library
+ *
+ * TODO:
+ * figure out why QNetworkReply::readyRead() not called if server returns code 204
 */
 
 #ifndef QYANDEXDISK_H
@@ -43,8 +46,8 @@ public:
 
 
 public slots:
-//    void readyRemove();
-//    void readyMkdir();
+    void readyRemove();
+    void readyMkdir();
     void readyCapacity();
 //    void readyUploadPhase1();
 //    void readyUploadPhase2();
@@ -60,12 +63,11 @@ signals:
     void signalError();
 
 private:
-    // fills m_request with provided Disk API method and it's arg
-    void fillRequest(QString method, QString arg);
+    // creates QNetworkRequest with provided Disk API method and it's arg
+    QNetworkRequest* createRequest(QString method, QString arg);
 
     QString token;
     QNetworkAccessManager *m_networkAccessManager;
-    QNetworkRequest m_request;
     QNetworkReply *m_reply;
 
     QString baseUrl = "https://cloud-api.yandex.net/v1/disk/";
