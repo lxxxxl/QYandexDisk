@@ -18,14 +18,14 @@ void QYandexDisk::upload(QString filename, QByteArray data)
     QNetworkRequest *request = createRequest("resources/upload", filename);
     m_reply = this->m_networkAccessManager->get(*request);
     m_reply->setProperty("data", data);
-    connect(m_reply, SIGNAL(readyRead()), this, SLOT(readyUploadPhase1()));
+    connect(m_reply, SIGNAL(finished()), this, SLOT(readyUploadPhase1()));
 }
 // remove file or directory from disk
 void QYandexDisk::remove(QString path)
 {
     QNetworkRequest *request = createRequest("resources", path);
     m_reply = this->m_networkAccessManager->deleteResource(*request);
-    connect(m_reply, SIGNAL(readyRead()), this, SLOT(readyRemove()));
+    connect(m_reply, SIGNAL(finished()), this, SLOT(readyRemove()));
     delete request;
 }
 // create new directory
@@ -33,7 +33,7 @@ void QYandexDisk::mkdir(QString path)
 {
     QNetworkRequest *request = createRequest("resources", path);
     m_reply = this->m_networkAccessManager->put(*request, QByteArray());
-    connect(m_reply, SIGNAL(readyRead()), this, SLOT(readyMkdir()));
+    connect(m_reply, SIGNAL(finished()), this, SLOT(readyMkdir()));
     delete request;
 
 }

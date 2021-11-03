@@ -1,8 +1,7 @@
 /* Yandex Disk client library
  *
  * TODO:
- * figure out why QNetworkReply::readyRead() not called if server returns code 204
-*/
+ */
 
 #ifndef QYANDEXDISK_H
 #define QYANDEXDISK_H
