@@ -1,6 +1,4 @@
 /* Yandex Disk client library
- *
- * TODO:
  */
 
 #ifndef QYANDEXDISK_H
@@ -58,18 +56,21 @@ public:
             QString md5;
      };
 
+    enum RequestType{
+        rtDownload1,
+        rtDownload2,
+        rtUpload1,
+        rtUpload2,
+        rtRemove,
+        rtMkdir,
+        rtList,
+        rtSize,
+        rtCapacity
+    };
+
 
 public slots:
-    void readyRemove();
-    void readyMkdir();
-    void readyCapacity();
-    void readyUploadPhase1();
-    void readyUploadPhase2();
-    void readyDownloadPhase1();
-    void readyDownloadPhase2();
-    void readySize();
-    void readyList();
-
+    void finished(QNetworkReply *reply);
 signals:
     void signalRemoved(bool status);
     void signalCreated(bool status);
@@ -82,14 +83,22 @@ signals:
 
 private:
     // creates QNetworkRequest with provided Disk API method and it's arg
-    QNetworkRequest* createRequest(QString method, QString arg);
+    QNetworkRequest createRequest(QString method, QString arg);
 
     QString token;
     QNetworkAccessManager *m_networkAccessManager;
-    QNetworkReply *m_reply;
 
     QString baseUrl = "https://cloud-api.yandex.net/v1/disk/";
 
+    void finishedRemove(QNetworkReply *reply);
+    void finishedMkdir(QNetworkReply *reply);
+    void finishedCapacity(QNetworkReply *reply);
+    void finishedUploadPhase1(QNetworkReply *reply);
+    void finishedUploadPhase2(QNetworkReply *reply);
+    void finishedDownloadPhase1(QNetworkReply *reply);
+    void finishedDownloadPhase2(QNetworkReply *reply);
+    void finishedSize(QNetworkReply *reply);
+    void finishedList(QNetworkReply *reply);
 
     enum HttpResponseCode{
                 HTTP_OK = 200,

@@ -7,188 +7,237 @@ QYandexDisk::QYandexDisk(QString token, QObject *parent) : QObject(parent)
     m_networkAccessManager = new QNetworkAccessManager(this);
     // allow processing HTTP redirects
     m_networkAccessManager->setRedirectPolicy(QNetworkRequest::NoLessSafeRedirectPolicy);
+    connect(m_networkAccessManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(finished(QNetworkReply*)));
 }
 
 
 void QYandexDisk::download(QString filename)
 {
-    QNetworkRequest *request = createRequest("resources/download", filename);
-    m_reply = this->m_networkAccessManager->get(*request);
-    connect(m_reply, SIGNAL(finished()), this, SLOT(readyDownloadPhase1()));
+    QNetworkReply* reply = this->m_networkAccessManager->get(
+                createRequest("resources/download", filename)
+                );
+    reply->setProperty("type", rtDownload1);
 }
+
 // upload file to disk
 void QYandexDisk::upload(QString filename, QByteArray data)
 {
-    QNetworkRequest *request = createRequest("resources/upload", filename);
-    m_reply = this->m_networkAccessManager->get(*request);
-    m_reply->setProperty("data", data);
-    connect(m_reply, SIGNAL(finished()), this, SLOT(readyUploadPhase1()));
+    QNetworkReply* reply = this->m_networkAccessManager->get(
+                createRequest("resources/upload", filename)
+                );
+    reply->setProperty("data", data);
+    reply->setProperty("type", rtUpload1);
 }
+
 // remove file or directory from disk
 void QYandexDisk::remove(QString path)
 {
-    QNetworkRequest *request = createRequest("resources", path);
-    m_reply = this->m_networkAccessManager->deleteResource(*request);
-    connect(m_reply, SIGNAL(finished()), this, SLOT(readyRemove()));
-    delete request;
+    QNetworkReply* reply = this->m_networkAccessManager->deleteResource(
+                createRequest("resources", path)
+                );
+    reply->setProperty("type", rtRemove);
 }
+
 // create new directory
 void QYandexDisk::mkdir(QString path)
 {
-    QNetworkRequest *request = createRequest("resources", path);
-    m_reply = this->m_networkAccessManager->put(*request, QByteArray());
-    connect(m_reply, SIGNAL(finished()), this, SLOT(readyMkdir()));
-    delete request;
-
+    QNetworkReply* reply = this->m_networkAccessManager->put(
+                createRequest("resources", path),
+                QByteArray()
+                );
+    reply->setProperty("type", rtMkdir);
 }
+
 // list files in directory
 void QYandexDisk::list(QString path)
 {
-    QNetworkRequest *request = createRequest("resources", path);
-    m_reply = this->m_networkAccessManager->get(*request);
-    connect(m_reply, SIGNAL(finished()), this, SLOT(readyList()));
+    QNetworkReply* reply = this->m_networkAccessManager->get(
+                createRequest("resources", path)
+                );
+    reply->setProperty("type", rtList);
 }
+
 // get file size
 void QYandexDisk::size(QString path)
 {
-    QNetworkRequest *request = createRequest("resources", path);
-    m_reply = this->m_networkAccessManager->get(*request);
-    connect(m_reply, SIGNAL(readyRead()), this, SLOT(readySize()));
+    QNetworkReply* reply = this->m_networkAccessManager->get(
+                createRequest("resources", path)
+                );
+    reply->setProperty("type", rtSize);
 }
 // get free space count on Disk
 void QYandexDisk::capacity()
 {
-    QNetworkRequest *request = createRequest(QString(), QString());
-    m_reply = this->m_networkAccessManager->get(*request);
-    connect(m_reply, SIGNAL(readyRead()), this, SLOT(readyCapacity()));
-    delete request;
+    QNetworkReply* reply = this->m_networkAccessManager->get(
+                createRequest(QString(), QString())
+                );
+    reply->setProperty("type", rtCapacity);
 }
 
-QNetworkRequest *QYandexDisk::createRequest(QString method, QString arg)
+QNetworkRequest QYandexDisk::createRequest(QString method, QString arg)
 {
 
     QString url = baseUrl + method;
     if (arg.length() > 0)
         url += "?path=" + arg;
-    QNetworkRequest *request = new QNetworkRequest(QUrl(url));
-    request->setRawHeader("Authorization", QString("OAuth " + this->token).toLocal8Bit());
+    QNetworkRequest request;
+    request.setUrl(QUrl(url));
+    request.setRawHeader("Authorization", QString("OAuth " + this->token).toLocal8Bit());
     return request;
 }
 
-// slot for processing "capacity" API request
-void QYandexDisk::readyCapacity()
+// slot for processing all responses
+void QYandexDisk::finished(QNetworkReply *reply)
 {
-    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    RequestType type = (RequestType)reply->property("type").toUInt();
+    switch (type) {
+    case rtDownload1:
+        finishedDownloadPhase1(reply);
+        break;
+    case rtDownload2:
+        finishedDownloadPhase2(reply);
+        break;
+    case rtUpload1:
+        finishedUploadPhase1(reply);
+        break;
+    case rtUpload2:
+        finishedUploadPhase2(reply);
+        break;
+    case rtRemove:
+        finishedRemove(reply);
+        break;
+    case rtMkdir:
+        finishedMkdir(reply);
+        break;
+    case rtList:
+        finishedList(reply);
+        break;
+    case rtSize:
+        finishedSize(reply);
+        break;
+    case rtCapacity:
+        finishedCapacity(reply);
+        break;
+    }
+    reply->deleteLater();
+}
+
+// slot for processing "capacity" API request
+void QYandexDisk::finishedCapacity(QNetworkReply *reply)
+{
+    QVariant statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
     int status = statusCode.toInt();
     if (status != HTTP_OK){
         emit signalError();
         return;
     }
 
-    QByteArray reply = m_reply->readAll();
+    QByteArray resp = reply->readAll();
     // parse JSON
-    QJsonDocument replyDoc = QJsonDocument::fromJson(reply);
+    QJsonDocument replyDoc = QJsonDocument::fromJson(resp);
     QJsonObject rootObject = replyDoc.object();
 
     CapacityInfo info;
     info.totalSpace = rootObject.value("total_space").toDouble(0);
     info.trashSize = rootObject.value("trash_size").toDouble(0);
     info.usedSpace = rootObject.value("used_space").toDouble(0);
-    m_reply->deleteLater();
     emit signalCapacity(&info);
 
 }
 
 // slot for processing "delete" API request
-void QYandexDisk::readyRemove()
+void QYandexDisk::finishedRemove(QNetworkReply *reply)
 {
-    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    QVariant statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
     int status = statusCode.toInt();
-    m_reply->deleteLater();
     emit signalRemoved((status == HTTP_NO_CONTENT) || (status == HTTP_ACCEPTED));
 }
 
 // slot for processing "create-folder" API request
-void QYandexDisk::readyMkdir()
+void QYandexDisk::finishedMkdir(QNetworkReply *reply)
 {
-    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    QVariant statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
     int status = statusCode.toInt();
-    m_reply->deleteLater();
     emit signalCreated(status == HTTP_CREATED);
 }
 
 // slot for processing "upload" API request phase 1
-void QYandexDisk::readyUploadPhase1()
+void QYandexDisk::finishedUploadPhase1(QNetworkReply *reply)
 {
-    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    QVariant statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
     int status = statusCode.toInt();
     if (status != HTTP_OK){
         emit signalError();
         return;
     }
 
-    QByteArray reply = m_reply->readAll();
-    QJsonDocument doc = QJsonDocument::fromJson(reply);
+    QByteArray resp = reply->readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(resp);
     QJsonObject obj = doc.object();
 
     QString href = obj.value("href").toString();
-    QNetworkRequest *request = new QNetworkRequest(QUrl(href));
-    QByteArray data = m_reply->property("data").toByteArray();
-    m_reply = this->m_networkAccessManager->put(*request, data);
-    connect(m_reply, SIGNAL(finished()), this, SLOT(readyUploadPhase2()));
+    QNetworkRequest request;
+    request.setUrl(QUrl(href));
+
+    QByteArray data = reply->property("data").toByteArray();
+    QNetworkReply *reply2 = this->m_networkAccessManager->put(request, data);
+    reply2->setProperty("type", rtUpload2);
 }
 
 // slot for processing "upload" API request phase 2
-void QYandexDisk::readyUploadPhase2()
+void QYandexDisk::finishedUploadPhase2(QNetworkReply *reply)
 {
-    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    QVariant statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
     int status = statusCode.toInt();
     emit signalUploaded(status == HTTP_CREATED);
 }
 
 // slot for processing "download" API request phase 1
-void QYandexDisk::readyDownloadPhase1()
+void QYandexDisk::finishedDownloadPhase1(QNetworkReply *reply)
 {
-    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    QVariant statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
     int status = statusCode.toInt();
     if (status != HTTP_OK){
         emit signalError();
         return;
     }
 
-    QByteArray reply = m_reply->readAll();
-    QJsonDocument doc = QJsonDocument::fromJson(reply);
+    QByteArray resp = reply->readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(resp);
     QJsonObject obj = doc.object();
 
     QString href = obj.value("href").toString();
-    QNetworkRequest *request = new QNetworkRequest(QUrl(href));
-    m_reply = this->m_networkAccessManager->get(*request);
-    connect(m_reply, SIGNAL(finished()), this, SLOT(readyDownloadPhase2()));
+    QNetworkRequest request;
+    request.setUrl(QUrl(href));
+
+    QNetworkReply *reply2 = this->m_networkAccessManager->get(request);
+    reply2->setProperty("type", rtDownload2);
 }
 
 // slot for processing "download" API request phase 2
-void QYandexDisk::readyDownloadPhase2()
+void QYandexDisk::finishedDownloadPhase2(QNetworkReply *reply)
 {
-    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    QVariant statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
     int status = statusCode.toInt();
     if (status == HTTP_OK)
-        emit signalDownloaded(m_reply->readAll());
+        emit signalDownloaded(reply->readAll());
     else
         emit signalError();
 }
 
 // slot for processing "size" API request
-void QYandexDisk::readySize()
+void QYandexDisk::finishedSize(QNetworkReply *reply)
 {
-    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    QVariant statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
     int status = statusCode.toInt();
     if (status != HTTP_OK){
         emit signalError();
         return;
     }
 
-    QByteArray reply = m_reply->readAll();
-    QJsonDocument doc = QJsonDocument::fromJson(reply);
+    QByteArray resp = reply->readAll();
+
+    QJsonDocument doc = QJsonDocument::fromJson(resp);
     QJsonObject obj = doc.object();
 
     if (!obj.contains("size")){
@@ -201,9 +250,9 @@ void QYandexDisk::readySize()
 }
 
 // slot for processing "list" API request
-void QYandexDisk::readyList()
+void QYandexDisk::finishedList(QNetworkReply *reply)
 {
-    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    QVariant statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
     int status = statusCode.toInt();
     if (status != HTTP_OK){
         emit signalError();
@@ -212,8 +261,8 @@ void QYandexDisk::readyList()
 
     QList<FileInfo*> list;
 
-    QByteArray reply = m_reply->readAll();
-    QJsonDocument doc = QJsonDocument::fromJson(reply);
+    QByteArray resp = reply->readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(resp);
     QJsonObject obj = doc.object();
 
     QJsonObject _embedded = obj.value("_embedded").toObject();
