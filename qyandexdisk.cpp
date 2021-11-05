@@ -49,7 +49,9 @@ void QYandexDisk::list(QString path)
 // get file size
 void QYandexDisk::size(QString path)
 {
-
+    QNetworkRequest *request = createRequest("resources", path);
+    m_reply = this->m_networkAccessManager->get(*request);
+    connect(m_reply, SIGNAL(readyRead()), this, SLOT(readySize()));
 }
 // get free space count on Disk
 void QYandexDisk::capacity()
@@ -171,4 +173,27 @@ void QYandexDisk::readyDownloadPhase2()
         emit signalDownloaded(m_reply->readAll());
     else
         emit signalError();
+}
+
+// slot for processing "size" API request
+void QYandexDisk::readySize()
+{
+    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    int status = statusCode.toInt();
+    if (status != HTTP_OK){
+        emit signalError();
+        return;
+    }
+
+    QByteArray reply = m_reply->readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(reply);
+    QJsonObject obj = doc.object();
+
+    if (!obj.contains("size")){
+        emit signalError();
+        return;
+    }
+
+    qint64 size = obj.value("size").toDouble(0);
+    emit signalSize(size);
 }

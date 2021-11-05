@@ -34,6 +34,7 @@ public:
     // list files in directory
     void list(QString path);
     // get file size
+    // https://yandex.ru/dev/disk/api/reference/meta.html
     void size(QString path);
     // https://yandex.ru/dev/disk/api/reference/capacity.html
     // get free space count on Disk
@@ -54,6 +55,7 @@ public slots:
     void readyUploadPhase2();
     void readyDownloadPhase1();
     void readyDownloadPhase2();
+    void readySize();
 
 signals:
     void signalRemoved(bool status);
@@ -61,6 +63,7 @@ signals:
     void signalCapacity(QYandexDisk::CapacityInfo *info);
     void signalUploaded(bool status);
     void signalDownloaded(QByteArray data);
+    void signalSize(qint64 size);
     void signalError();
 
 private:
