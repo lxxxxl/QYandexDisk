@@ -44,7 +44,9 @@ void QYandexDisk::mkdir(QString path)
 // list files in directory
 void QYandexDisk::list(QString path)
 {
-
+    QNetworkRequest *request = createRequest("resources", path);
+    m_reply = this->m_networkAccessManager->get(*request);
+    connect(m_reply, SIGNAL(finished()), this, SLOT(readyList()));
 }
 // get file size
 void QYandexDisk::size(QString path)
@@ -196,4 +198,47 @@ void QYandexDisk::readySize()
 
     qint64 size = obj.value("size").toDouble(0);
     emit signalSize(size);
+}
+
+// slot for processing "list" API request
+void QYandexDisk::readyList()
+{
+    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    int status = statusCode.toInt();
+    if (status != HTTP_OK){
+        emit signalError();
+        return;
+    }
+
+    QList<FileInfo*> list;
+
+    QByteArray reply = m_reply->readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(reply);
+    QJsonObject obj = doc.object();
+
+    QJsonObject _embedded = obj.value("_embedded").toObject();
+    QJsonArray items = _embedded.value("items").toArray();
+
+    for (const QJsonValue& item: qAsConst(items)){
+        QJsonObject object = item.toObject();
+        FileInfo *info = new FileInfo;
+        QString type = object.value("type").toString();
+        info->isDir = (type == "dir");
+        if (info->isDir){
+            info->md5 = QString();
+            info->size = 0;
+        }
+        else{
+            info->md5 = object.value("md5").toString();
+            info->size = object.value("size").toDouble();
+        }
+        info->name = object.value("name").toString();
+        info->path = object.value("path").toString();
+        QString created = object.value("created").toString();
+        info->created = QDateTime::fromString(created, Qt::ISODate);
+        info->modified = QDateTime::fromString(object.value("modified").toString(), Qt::ISODate);
+
+        list.append(info);
+    }
+    emit signalList(list);
 }

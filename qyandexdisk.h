@@ -11,6 +11,7 @@
 #include <QNetworkReply>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QJsonArray>
 
 
 
@@ -32,6 +33,7 @@ public:
     // https://yandex.ru/dev/disk/api/reference/create-folder.html
     void mkdir(QString path);
     // list files in directory
+    // https://yandex.ru/dev/disk/api/reference/meta.html
     void list(QString path);
     // get file size
     // https://yandex.ru/dev/disk/api/reference/meta.html
@@ -46,6 +48,16 @@ public:
         qint64 usedSpace;
     };
 
+    struct FileInfo{
+            QString name;
+            QString path;
+            qint64 size;
+            QDateTime created;
+            QDateTime modified;
+            bool isDir;
+            QString md5;
+     };
+
 
 public slots:
     void readyRemove();
@@ -56,6 +68,7 @@ public slots:
     void readyDownloadPhase1();
     void readyDownloadPhase2();
     void readySize();
+    void readyList();
 
 signals:
     void signalRemoved(bool status);
@@ -64,6 +77,7 @@ signals:
     void signalUploaded(bool status);
     void signalDownloaded(QByteArray data);
     void signalSize(qint64 size);
+    void signalList(QList<QYandexDisk::FileInfo*> list);
     void signalError();
 
 private:
