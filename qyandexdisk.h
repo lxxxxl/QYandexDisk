@@ -20,6 +20,7 @@ class QYandexDisk : public QObject
 public:
     explicit QYandexDisk(QString token, QObject *parent = nullptr);
     // download file from disk
+    // https://yandex.ru/dev/disk/api/reference/content.html
     void download(QString filename);
     // upload file to disk
     // https://yandex.ru/dev/disk/api/reference/upload.html
@@ -51,8 +52,8 @@ public slots:
     void readyCapacity();
     void readyUploadPhase1();
     void readyUploadPhase2();
-//    void readyDownloadPhase1();
-//    void readyDownloadPhase2();
+    void readyDownloadPhase1();
+    void readyDownloadPhase2();
 
 signals:
     void signalRemoved(bool status);

@@ -5,12 +5,16 @@ QYandexDisk::QYandexDisk(QString token, QObject *parent) : QObject(parent)
     this->token = token;
 
     m_networkAccessManager = new QNetworkAccessManager(this);
+    // allow processing HTTP redirects
+    m_networkAccessManager->setRedirectPolicy(QNetworkRequest::NoLessSafeRedirectPolicy);
 }
 
 
 void QYandexDisk::download(QString filename)
 {
-
+    QNetworkRequest *request = createRequest("resources/download", filename);
+    m_reply = this->m_networkAccessManager->get(*request);
+    connect(m_reply, SIGNAL(finished()), this, SLOT(readyDownloadPhase1()));
 }
 // upload file to disk
 void QYandexDisk::upload(QString filename, QByteArray data)
@@ -136,4 +140,35 @@ void QYandexDisk::readyUploadPhase2()
     QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
     int status = statusCode.toInt();
     emit signalUploaded(status == HTTP_CREATED);
+}
+
+// slot for processing "download" API request phase 1
+void QYandexDisk::readyDownloadPhase1()
+{
+    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    int status = statusCode.toInt();
+    if (status != HTTP_OK){
+        emit signalError();
+        return;
+    }
+
+    QByteArray reply = m_reply->readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(reply);
+    QJsonObject obj = doc.object();
+
+    QString href = obj.value("href").toString();
+    QNetworkRequest *request = new QNetworkRequest(QUrl(href));
+    m_reply = this->m_networkAccessManager->get(*request);
+    connect(m_reply, SIGNAL(finished()), this, SLOT(readyDownloadPhase2()));
+}
+
+// slot for processing "download" API request phase 2
+void QYandexDisk::readyDownloadPhase2()
+{
+    QVariant statusCode = m_reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    int status = statusCode.toInt();
+    if (status == HTTP_OK)
+        emit signalDownloaded(m_reply->readAll());
+    else
+        emit signalError();
 }
